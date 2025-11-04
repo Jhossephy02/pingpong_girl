@@ -1,5 +1,5 @@
 # ============================================================================
-# src/game.py - Pong con Caja de Diálogo estilo Pokémon
+# src/game.py - Pong con Caja de Diálogo Fija Abajo (Estilo Undertale)
 # ============================================================================
 
 import pygame
@@ -23,6 +23,9 @@ BEIGE = (240, 224, 200)
 
 # Configuración del juego
 WIDTH, HEIGHT = 800, 600
+GAME_AREA_HEIGHT = 450  # El juego ocupa solo la parte superior
+DIALOGUE_BOX_HEIGHT = 150  # Altura de la caja de diálogo fija
+
 PADDLE_WIDTH, PADDLE_HEIGHT = 10, 80
 BALL_SIZE = 12
 
@@ -44,14 +47,14 @@ class Game:
         
         settings = self.difficulty_settings[difficulty]
         
-        # Paletas
-        self.player_paddle = pygame.Rect(30, HEIGHT//2 - PADDLE_HEIGHT//2, 
+        # Paletas (ajustadas para el área de juego más pequeña)
+        self.player_paddle = pygame.Rect(30, GAME_AREA_HEIGHT//2 - PADDLE_HEIGHT//2, 
                                         PADDLE_WIDTH, PADDLE_HEIGHT)
-        self.ai_paddle = pygame.Rect(WIDTH - 40, HEIGHT//2 - PADDLE_HEIGHT//2, 
+        self.ai_paddle = pygame.Rect(WIDTH - 40, GAME_AREA_HEIGHT//2 - PADDLE_HEIGHT//2, 
                                      PADDLE_WIDTH, PADDLE_HEIGHT)
         
         # Pelota
-        self.ball = pygame.Rect(WIDTH//2, HEIGHT//2, BALL_SIZE, BALL_SIZE)
+        self.ball = pygame.Rect(WIDTH//2, GAME_AREA_HEIGHT//2, BALL_SIZE, BALL_SIZE)
         self.ball_speed_x = settings["ball_speed"] * random.choice([-1, 1])
         self.ball_speed_y = settings["ball_speed"] * random.choice([-1, 1])
         
@@ -85,23 +88,22 @@ class Game:
             self.current_girl_sprite = None
             self.current_girl_line = "¡Vamos!"
         
-        # Control de cambio de expresión
-        self.expression_timer = 0
-        self.expression_duration = 180  # 3 segundos (60 FPS)
-        
         # Fuentes
         self.font_score = pygame.font.SysFont("Courier New", 40, bold=True)
-        self.font_small = pygame.font.SysFont("Courier New", 20)
-        self.font_dialogue = pygame.font.SysFont("Arial", 18, bold=True)  # Estilo Pokémon
-        self.font_tiny = pygame.font.SysFont("Courier New", 14)
+        self.font_small = pygame.font.SysFont("Courier New", 18)
+        self.font_dialogue = pygame.font.SysFont("Arial", 16, bold=True)
+        self.font_tiny = pygame.font.SysFont("Courier New", 12)
         
-        # 🎮 Trail de la pelota (efecto visual)
+        # 🎮 Trail de la pelota
         self.ball_trail = []
         self.max_trail_length = 8
+        
+        # Timer para animación de texto
+        self.text_animation_frame = 0
     
     def reset_ball(self):
         """Reinicia la posición de la pelota"""
-        self.ball.center = (WIDTH//2, HEIGHT//2)
+        self.ball.center = (WIDTH//2, GAME_AREA_HEIGHT//2)
         settings = self.difficulty_settings[self.difficulty]
         self.ball_speed_x = settings["ball_speed"] * random.choice([-1, 1])
         self.ball_speed_y = settings["ball_speed"] * random.choice([-1, 1])
@@ -122,8 +124,6 @@ class Game:
             self.current_girl_sprite, self.current_girl_line = get_expression_by_confianza(
                 self.confianza, self.girl_sprites
             )
-            # Reiniciar timer para mostrar la nueva expresión
-            self.expression_timer = self.expression_duration
     
     def get_confianza_state(self, confianza):
         """Retorna el estado según la confianza (0=enojada, 1=neutral, 2=smug)"""
@@ -143,18 +143,22 @@ class Game:
         keys = pygame.key.get_pressed()
         if keys[pygame.K_w] and self.player_paddle.top > 0:
             self.player_paddle.y -= self.player_speed
-        if keys[pygame.K_s] and self.player_paddle.bottom < HEIGHT:
+        if keys[pygame.K_s] and self.player_paddle.bottom < GAME_AREA_HEIGHT:
             self.player_paddle.y += self.player_speed
         
         # Movimiento de la IA
         move_ai(self.ai_paddle, self.ball, self.ai_speed)
         
-        # Asegurar que las paletas no salgan de la pantalla
-        self.player_paddle.clamp_ip(pygame.Rect(0, 0, WIDTH, HEIGHT))
+        # Asegurar que las paletas no salgan del área de juego
+        if self.player_paddle.top < 0:
+            self.player_paddle.top = 0
+        if self.player_paddle.bottom > GAME_AREA_HEIGHT:
+            self.player_paddle.bottom = GAME_AREA_HEIGHT
+        
         if self.ai_paddle.top < 0:
             self.ai_paddle.top = 0
-        if self.ai_paddle.bottom > HEIGHT:
-            self.ai_paddle.bottom = HEIGHT
+        if self.ai_paddle.bottom > GAME_AREA_HEIGHT:
+            self.ai_paddle.bottom = GAME_AREA_HEIGHT
         
         # 🎮 Guardar posición anterior para trail
         self.ball_trail.append((self.ball.x, self.ball.y))
@@ -165,10 +169,13 @@ class Game:
         self.ball.x += self.current_ball_speed_x
         self.ball.y += self.current_ball_speed_y
         
-        # Rebote en paredes superior e inferior
-        if self.ball.top <= 0 or self.ball.bottom >= HEIGHT:
+        # Rebote en paredes superior e inferior (solo en área de juego)
+        if self.ball.top <= 0 or self.ball.bottom >= GAME_AREA_HEIGHT:
             self.current_ball_speed_y *= -1
-            self.ball.clamp_ip(pygame.Rect(0, 0, WIDTH, HEIGHT))
+            if self.ball.top <= 0:
+                self.ball.top = 0
+            if self.ball.bottom >= GAME_AREA_HEIGHT:
+                self.ball.bottom = GAME_AREA_HEIGHT
         
         # Colisión con paletas
         if self.ball.colliderect(self.player_paddle):
@@ -194,7 +201,7 @@ class Game:
             self.current_ball_speed_y += hit_pos * 2
         
         # Limitar velocidad máxima
-        max_speed = 15
+        max_speed = 25
         if abs(self.current_ball_speed_x) > max_speed:
             self.current_ball_speed_x = max_speed if self.current_ball_speed_x > 0 else -max_speed
         if abs(self.current_ball_speed_y) > max_speed:
@@ -218,13 +225,12 @@ class Game:
             self.update_confianza(-25)
             self.reset_ball()
         
-        # Actualizar timer de expresión
-        if self.expression_timer > 0:
-            self.expression_timer -= 1
+        # Actualizar animación de texto
+        self.text_animation_frame += 1
         
         # Verificar fin del juego
         if (self.player_hp <= 0 or self.ai_hp <= 0 or 
-            self.score_player >= 10 or self.score_ai >= 10):
+            self.score_player >= 12 or self.score_ai >= 12):
             return True
         
         return False
@@ -233,8 +239,10 @@ class Game:
         """Dibuja el juego en la pantalla"""
         screen.fill(BLACK)
         
+        # ========== ÁREA DE JUEGO (ARRIBA) ==========
+        
         # Línea central punteada
-        for y in range(0, HEIGHT, 20):
+        for y in range(0, GAME_AREA_HEIGHT, 20):
             pygame.draw.rect(screen, DARK_GREEN, (WIDTH//2 - 2, y, 4, 10))
         
         # 🎮 Trail de la pelota
@@ -272,92 +280,93 @@ class Game:
         # Barras de HP
         self.draw_hp_bars(screen)
         
-        # 🎨 Caja de diálogo estilo Pokémon
-        self.draw_pokemon_dialogue_box(screen)
+        # Línea divisoria entre juego y caja de diálogo
+        pygame.draw.line(screen, WHITE, (0, GAME_AREA_HEIGHT), (WIDTH, GAME_AREA_HEIGHT), 3)
         
-        # Controles
-        controls = self.font_small.render("[W/S] Mover  |  [ESC] Menú", True, DARK_GREEN)
-        screen.blit(controls, (WIDTH//2 - controls.get_width()//2, HEIGHT - 30))
+        # ========== CAJA DE DIÁLOGO (ABAJO) - SIEMPRE VISIBLE ==========
+        self.draw_undertale_dialogue_box(screen)
+        
+        # Controles (arriba a la derecha)
+        controls = self.font_tiny.render("[W/S] Mover  [ESC] Menú", True, GRAY)
+        screen.blit(controls, (WIDTH - controls.get_width() - 10, 10))
     
     def draw_hp_bars(self, screen):
         """Dibuja las barras de HP en el juego"""
-        hp_width = 150
-        hp_height = 15
+        hp_width = 120
+        hp_height = 12
         
         # HP Jugador (izquierda)
-        pygame.draw.rect(screen, WHITE, (50, 70, hp_width + 4, hp_height + 4))
-        pygame.draw.rect(screen, BLACK, (52, 72, hp_width, hp_height))
+        pygame.draw.rect(screen, WHITE, (30, 70, hp_width + 4, hp_height + 4))
+        pygame.draw.rect(screen, BLACK, (32, 72, hp_width, hp_height))
         hp_color = GREEN if self.player_hp > 50 else YELLOW if self.player_hp > 25 else RED
-        pygame.draw.rect(screen, hp_color, (52, 72, int(hp_width * self.player_hp / 100), hp_height))
+        pygame.draw.rect(screen, hp_color, (32, 72, int(hp_width * self.player_hp / 100), hp_height))
         
         player_text = self.font_small.render("TÚ", True, WHITE)
-        screen.blit(player_text, (52, 50))
+        screen.blit(player_text, (32, 52))
         
         # HP IA (derecha)
-        pygame.draw.rect(screen, WHITE, (WIDTH - 50 - hp_width - 4, 70, hp_width + 4, hp_height + 4))
-        pygame.draw.rect(screen, BLACK, (WIDTH - 50 - hp_width - 2, 72, hp_width, hp_height))
+        pygame.draw.rect(screen, WHITE, (WIDTH - 30 - hp_width - 4, 70, hp_width + 4, hp_height + 4))
+        pygame.draw.rect(screen, BLACK, (WIDTH - 30 - hp_width - 2, 72, hp_width, hp_height))
         hp_color = GREEN if self.ai_hp > 50 else YELLOW if self.ai_hp > 25 else RED
-        pygame.draw.rect(screen, hp_color, (WIDTH - 50 - hp_width - 2, 72, 
+        pygame.draw.rect(screen, hp_color, (WIDTH - 30 - hp_width - 2, 72, 
                                            int(hp_width * self.ai_hp / 100), hp_height))
         
         ai_text = self.font_small.render("ELLA", True, WHITE)
-        screen.blit(ai_text, (WIDTH - 50 - hp_width - 2, 50))
+        screen.blit(ai_text, (WIDTH - 30 - hp_width - 2, 52))
     
-    def draw_pokemon_dialogue_box(self, screen):
-        """Dibuja la caja de diálogo estilo Pokémon GBA con imagen de la flaca"""
+    def draw_undertale_dialogue_box(self, screen):
+        """Dibuja la caja de diálogo fija abajo (estilo Undertale/Pokémon)"""
         
-        # Solo mostrar si hay diálogo activo
-        if self.expression_timer <= 0:
-            return
+        box_y = GAME_AREA_HEIGHT
+        box_height = HEIGHT - GAME_AREA_HEIGHT
         
-        # Dimensiones de la caja (estilo Pokémon GBA)
-        box_x = 30
-        box_y = HEIGHT - 140
-        box_width = WIDTH - 60
-        box_height = 110
+        # Fondo de la caja
+        pygame.draw.rect(screen, BLACK, (0, box_y, WIDTH, box_height))
         
-        # Imagen de la flaca (lado derecho, como rival de Pokémon)
-        portrait_size = 90
-        portrait_x = box_x + box_width - portrait_size - 15
-        portrait_y = box_y + 10
+        # Borde exterior blanco (estilo Pokémon GBA)
+        border_margin = 15
+        inner_box = pygame.Rect(border_margin, box_y + border_margin, 
+                                WIDTH - border_margin * 2, box_height - border_margin * 2)
         
-        # === CAJA PRINCIPAL (estilo Pokémon) ===
-        # Borde exterior blanco grueso
-        pygame.draw.rect(screen, WHITE, (box_x, box_y, box_width, box_height), 0)
+        pygame.draw.rect(screen, WHITE, inner_box, 0)
+        pygame.draw.rect(screen, BLACK, (inner_box.x + 4, inner_box.y + 4, 
+                                         inner_box.width - 8, inner_box.height - 8), 0)
+        pygame.draw.rect(screen, BEIGE, (inner_box.x + 6, inner_box.y + 6, 
+                                         inner_box.width - 12, inner_box.height - 12), 0)
         
-        # Borde negro intermedio
-        pygame.draw.rect(screen, BLACK, (box_x + 4, box_y + 4, box_width - 8, box_height - 8), 0)
+        # === RETRATO DE LA FLACA (IZQUIERDA) ===
+        portrait_size = 100
+        portrait_x = inner_box.x + 10
+        portrait_y = inner_box.y + (inner_box.height - portrait_size) // 2
         
-        # Fondo beige interno (estilo GBA)
-        pygame.draw.rect(screen, BEIGE, (box_x + 8, box_y + 8, box_width - 16, box_height - 16), 0)
+        # Borde del retrato
+        pygame.draw.rect(screen, BLACK, (portrait_x - 2, portrait_y - 2, 
+                                        portrait_size + 4, portrait_size + 4), 0)
+        pygame.draw.rect(screen, WHITE, (portrait_x - 2, portrait_y - 2, 
+                                        portrait_size + 4, portrait_size + 4), 2)
         
-        # === CONTENEDOR DE IMAGEN ===
-        # Borde de la imagen (lado derecho)
-        img_border_rect = pygame.Rect(portrait_x - 4, portrait_y - 4, portrait_size + 8, portrait_size + 8)
-        pygame.draw.rect(screen, BLACK, img_border_rect, 0)
-        pygame.draw.rect(screen, WHITE, img_border_rect, 3)
-        
-        # Fondo de la imagen
+        # Fondo del retrato
         pygame.draw.rect(screen, DARK_BLUE, (portrait_x, portrait_y, portrait_size, portrait_size), 0)
         
-        # === IMAGEN DE LA FLACA ===
+        # Sprite de la flaca
         if self.current_girl_sprite:
-            # Escalar imagen para que quepa en el cuadro
             scaled_sprite = pygame.transform.scale(self.current_girl_sprite, (portrait_size, portrait_size))
             screen.blit(scaled_sprite, (portrait_x, portrait_y))
         else:
-            # Placeholder si no hay sprite
+            # Placeholder
             pygame.draw.circle(screen, (255, 200, 150), 
-                             (portrait_x + portrait_size//2, portrait_y + portrait_size//2), 35)
-            pygame.draw.circle(screen, BLACK, (portrait_x + portrait_size//2 - 12, portrait_y + portrait_size//2 - 8), 5)
-            pygame.draw.circle(screen, BLACK, (portrait_x + portrait_size//2 + 12, portrait_y + portrait_size//2 - 8), 5)
+                             (portrait_x + portrait_size//2, portrait_y + portrait_size//2), 40)
+            pygame.draw.circle(screen, BLACK, 
+                             (portrait_x + portrait_size//2 - 15, portrait_y + portrait_size//2 - 10), 5)
+            pygame.draw.circle(screen, BLACK, 
+                             (portrait_x + portrait_size//2 + 15, portrait_y + portrait_size//2 - 10), 5)
         
-        # === ÁREA DE TEXTO ===
-        text_x = box_x + 20
-        text_y = box_y + 20
-        text_width = box_width - portrait_size - 50
+        # === ÁREA DE TEXTO (DERECHA) ===
+        text_x = portrait_x + portrait_size + 15
+        text_y = inner_box.y + 15
+        text_width = inner_box.width - portrait_size - 40
         
-        # Dividir texto en líneas que quepan
+        # Dividir texto en líneas
         words = self.current_girl_line.split()
         lines = []
         current_line = ""
@@ -374,28 +383,30 @@ class Game:
         if current_line:
             lines.append(current_line.strip())
         
-        # Dibujar texto (máximo 3 líneas)
-        for i, line in enumerate(lines[:3]):
-            # Sombra del texto
+        # Dibujar texto (máximo 2 líneas)
+        for i, line in enumerate(lines[:2]):
+            # Sombra
             shadow = self.font_dialogue.render(line, True, GRAY)
-            screen.blit(shadow, (text_x + 2, text_y + 2 + i * 28))
+            screen.blit(shadow, (text_x + 1, text_y + 1 + i * 22))
             
             # Texto principal
             text_surf = self.font_dialogue.render(line, True, BLACK)
-            screen.blit(text_surf, (text_x, text_y + i * 28))
+            screen.blit(text_surf, (text_x, text_y + i * 22))
         
-        # === INDICADOR DE CONFIANZA (mini barra estilo Pokémon) ===
+        # === BARRA DE CONFIANZA (DEBAJO DEL TEXTO) ===
         conf_bar_x = text_x
-        conf_bar_y = box_y + box_height - 25
-        conf_bar_width = 100
-        conf_bar_height = 10
+        conf_bar_y = text_y + 55
+        conf_bar_width = 150
+        conf_bar_height = 12
         
         # Label
         conf_label = self.font_tiny.render("CONFIANZA", True, BLACK)
-        screen.blit(conf_label, (conf_bar_x, conf_bar_y - 15))
+        screen.blit(conf_label, (conf_bar_x, conf_bar_y - 13))
         
-        # Barra
-        pygame.draw.rect(screen, BLACK, (conf_bar_x, conf_bar_y, conf_bar_width, conf_bar_height))
+        # Borde de la barra
+        pygame.draw.rect(screen, BLACK, (conf_bar_x - 1, conf_bar_y - 1, 
+                                        conf_bar_width + 2, conf_bar_height + 2), 2)
+        pygame.draw.rect(screen, WHITE, (conf_bar_x, conf_bar_y, conf_bar_width, conf_bar_height))
         
         # Color según confianza
         if self.confianza >= 75:
@@ -411,17 +422,45 @@ class Game:
         
         # Porcentaje
         percentage_text = self.font_tiny.render(f"{int(self.confianza)}%", True, BLACK)
-        screen.blit(percentage_text, (conf_bar_x + conf_bar_width + 5, conf_bar_y - 2))
+        screen.blit(percentage_text, (conf_bar_x + conf_bar_width + 8, conf_bar_y + 1))
         
-        # === FLECHA PARPADEANTE (indicador de continuar) ===
-        if pygame.time.get_ticks() % 1000 < 500:  # Parpadea cada medio segundo
-            arrow_x = box_x + box_width - 25
-            arrow_y = box_y + box_height - 20
-            pygame.draw.polygon(screen, BLACK, [
-                (arrow_x, arrow_y),
-                (arrow_x + 10, arrow_y),
-                (arrow_x + 5, arrow_y + 8)
-            ])
+        # Emoji según estado
+        emoji = self.get_confianza_emoji()
+        emoji_surf = self.font_small.render(emoji, True, BLACK)
+        screen.blit(emoji_surf, (conf_bar_x + conf_bar_width + 35, conf_bar_y - 3))
+        
+        # === INDICADOR DE ESTADO (ESQUINA INFERIOR DERECHA) ===
+        state_text = self.get_state_text()
+        state_color = self.get_state_color()
+        state_surf = self.font_tiny.render(state_text, True, state_color)
+        screen.blit(state_surf, (WIDTH - state_surf.get_width() - 20, HEIGHT - 20))
+    
+    def get_confianza_emoji(self):
+        """Retorna el emoji según el nivel de confianza"""
+        if self.confianza >= 75:
+            return "😈"
+        elif self.confianza <= 29:
+            return "😡"
+        else:
+            return "😏"
+    
+    def get_state_text(self):
+        """Retorna el texto de estado según confianza"""
+        if self.confianza >= 75:
+            return "* Dominante"
+        elif self.confianza <= 29:
+            return "* Enojada"
+        else:
+            return "* Neutral"
+    
+    def get_state_color(self):
+        """Retorna el color del estado"""
+        if self.confianza >= 75:
+            return ORANGE
+        elif self.confianza <= 29:
+            return RED
+        else:
+            return GREEN
 
 
 def run_game():
