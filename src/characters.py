@@ -1,5 +1,5 @@
 # ============================================================================
-# src/characters.py - Sistema de Personajes y Expresiones Dinámicas
+# src/characters.py - Sistema de Personajes con Carga Mejorada
 # ============================================================================
 
 import pygame
@@ -41,28 +41,43 @@ def load_girl_sprites():
     sprite_path = "assets/sprites/"
     sprites = []
     
-    # Intentar cargar cada sprite
-    sprite_files = ["girl_neutral.png", "girl_smug.png", "girl_angry.png"]
+    # Intentar cargar cada sprite (girl1 = neutral, girl2 = smug, girl3 = angry)
+    sprite_files = ["girl1.png", "girl2.png", "girl3.png"]
+    
+    print("🔍 Buscando sprites de la flaca...")
     
     for sprite_file in sprite_files:
         full_path = os.path.join(sprite_path, sprite_file)
-        try:
-            if os.path.exists(full_path):
-                sprite = pygame.image.load(full_path)
+        
+        # Verificar si existe
+        if os.path.exists(full_path):
+            try:
+                print(f"✅ Cargando: {full_path}")
+                sprite = pygame.image.load(full_path).convert_alpha()
+                
+                # Obtener tamaño original
+                original_size = sprite.get_size()
+                print(f"   Tamaño original: {original_size}")
+                
+                # Escalar a 160x160 (se ajustará después en el juego)
                 sprite = pygame.transform.scale(sprite, (160, 160))
                 sprites.append(sprite)
-            else:
-                # Si no existe, crear placeholder
+                print(f"   ✓ Sprite cargado correctamente")
+                
+            except Exception as e:
+                print(f"❌ Error cargando {sprite_file}: {e}")
                 sprites.append(create_placeholder_sprite())
-        except Exception as e:
-            print(f"⚠️ Error cargando {sprite_file}: {e}")
+        else:
+            print(f"⚠️ No se encontró: {full_path}")
+            print(f"   Usando placeholder para {sprite_file}")
             sprites.append(create_placeholder_sprite())
     
+    print(f"📊 Total sprites cargados: {len(sprites)}")
     return tuple(sprites)
 
 def create_placeholder_sprite():
     """Crea un sprite placeholder simple"""
-    surface = pygame.Surface((160, 160))
+    surface = pygame.Surface((160, 160), pygame.SRCALPHA)
     surface.fill((30, 30, 30))
     
     # Dibujar rostro simple
@@ -173,7 +188,8 @@ class Character:
         try:
             sprites = load_girl_sprites()
             return sprites[0]  # Neutral
-        except:
+        except Exception as e:
+            print(f"⚠️ Error cargando sprite del personaje: {e}")
             return create_placeholder_sprite()
     
     def get_dialogue(self, index):
