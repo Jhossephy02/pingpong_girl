@@ -140,12 +140,6 @@ class Game:
         Retorna True si el juego terminó
         """
         # Movimiento del jugador
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_w] and self.player_paddle.top > 0:
-            self.player_paddle.y -= self.player_speed
-        if keys[pygame.K_s] and self.player_paddle.bottom < GAME_AREA_HEIGHT:
-            self.player_paddle.y += self.player_speed
-        
         # Movimiento de la IA
         move_ai(self.ai_paddle, self.ball, self.ai_speed)
         
@@ -234,6 +228,20 @@ class Game:
             return True
         
         return False
+    
+    def mover_paleta_cabeza(self, dy):
+        """
+        Movimiento del jugador 1 controlado por la cabeza (arriba/abajo)
+        dy: valor de movimiento (positivo abajo, negativo arriba)
+        """
+        self.player_paddle.y += dy
+
+        # Limitar dentro del área de juego
+        if self.player_paddle.top < 0:
+            self.player_paddle.top = 0
+        if self.player_paddle.bottom > GAME_AREA_HEIGHT:
+            self.player_paddle.bottom = GAME_AREA_HEIGHT
+
     
     def draw(self, screen):
         """Dibuja el juego en la pantalla"""
